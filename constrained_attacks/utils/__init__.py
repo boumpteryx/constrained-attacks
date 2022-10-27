@@ -12,10 +12,12 @@ def mutate(x_original, x_mutation):
 
 
 def compute_distance(x_1, x_2, norm):
-    if norm in ["inf", np.inf]:
+    if norm in ["inf", np.inf, "Linf"]:
         distance = np.linalg.norm(x_1 - x_2, ord=np.inf, axis=-1)
-    elif norm in ["2", 2]:
+    elif norm in ["2", 2, "L2"]:
         distance = np.linalg.norm(x_1 - x_2, ord=2, axis=-1)
+    elif norm in ["L1"]:
+        distance = np.linalg.norm(x_1 - x_2, ord=1, axis=-1)
     else:
         raise NotImplementedError
 

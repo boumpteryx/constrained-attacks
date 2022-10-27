@@ -108,6 +108,9 @@ class Moeva2:
                 "int": get_crossover(
                     "int_two_point",
                 ),
+                "cat": get_crossover(
+                    "int_two_point",
+                ),
             },
         )
 
@@ -117,6 +120,7 @@ class Moeva2:
             {
                 "real": get_mutation("real_pm", eta=20),
                 "int": get_mutation("int_pm", eta=20),
+                "cat": get_mutation("int_pm", eta=20),
             },
         )
 

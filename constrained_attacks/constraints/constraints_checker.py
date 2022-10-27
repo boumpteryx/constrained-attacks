@@ -64,4 +64,5 @@ class ConstraintChecker:
             ]
         )
         constraints = np.min(constraints, axis=0)
+        print(constraints)
         return constraints
