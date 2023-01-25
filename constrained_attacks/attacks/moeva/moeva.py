@@ -229,7 +229,7 @@ class Moeva2:
 
         # Sequential Run
         if self.n_jobs == 1:
-            print("Sequential run.")
+            print("MoEva Sequential run.")
             out = [
                 self._batch_generate(x[batch_indexes], y[batch_indexes], i)
                 for i, batch_indexes in iterable
@@ -237,7 +237,7 @@ class Moeva2:
 
         # Parallel run
         else:
-            print("Parallel run.")
+            print("MoEva Parallel run.")
             out = Parallel(n_jobs=self.n_jobs)(
                 delayed(self._batch_generate)(
                     x[batch_indexes], y[batch_indexes], i
