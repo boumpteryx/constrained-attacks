@@ -108,9 +108,6 @@ class Moeva2:
                 "int": get_crossover(
                     "int_two_point",
                 ),
-                "cat": get_crossover(
-                    "int_two_point",
-                ),
             },
         )
 
@@ -120,7 +117,6 @@ class Moeva2:
             {
                 "real": get_mutation("real_pm", eta=20),
                 "int": get_mutation("int_pm", eta=20),
-                "cat": get_mutation("int_pm", eta=20),
             },
         )
 
@@ -229,7 +225,7 @@ class Moeva2:
 
         # Sequential Run
         if self.n_jobs == 1:
-            print("MoEva Sequential run.")
+            print("Sequential run.")
             out = [
                 self._batch_generate(x[batch_indexes], y[batch_indexes], i)
                 for i, batch_indexes in iterable
@@ -237,7 +233,7 @@ class Moeva2:
 
         # Parallel run
         else:
-            print("MoEva Parallel run.")
+            print("Parallel run.")
             out = Parallel(n_jobs=self.n_jobs)(
                 delayed(self._batch_generate)(
                     x[batch_indexes], y[batch_indexes], i
