@@ -94,15 +94,33 @@ class AdversarialProblem(Problem):
         # Retrieve original representation
 
         x_adv = np.repeat(self.x_clean.reshape(1, -1), x.shape[0], axis=0)
-        x_adv[:, self.constraints.mutable_features] = x
+        #x_adv[:, self.constraints.mutable_features] = x
 
         obj_misclassify = self._obj_misclassify(x_adv)
 
-        obj_distance = self._obj_distance(
-            self.fun_distance_preprocess(x_adv), self.x_clean_distance
-        )
+        x_preprocessed = self.fun_distance_preprocess(x_adv)
 
-        obj_constraints = self._calculate_constraints(x_adv)
+        if isinstance(x_preprocessed, tuple) and x_preprocessed[1] is not None:
+            #if it is a tuple, the first is the scaler, the second is the encoder
+            #if the scaler is not None, the input is scaled and we need to compute the distance directly
+            # but unscale to compute the constraints
+
+            unscaled, scaler, encoder = x_preprocessed
+            obj_distance = self._obj_distance(
+            x_adv, self.x_clean_distance
+            )
+            obj_constraints = self._calculate_constraints(unscaled)
+
+        else:
+            #otherwise, the features are not scaled and we need to scale them before computing the distances
+
+            scaled, _ = x_preprocessed
+
+            obj_distance = self._obj_distance(
+                scaled , self.x_clean_distance
+            )
+
+            obj_constraints = self._calculate_constraints(x_adv)
 
         F = [obj_misclassify, obj_distance, obj_constraints]
 
