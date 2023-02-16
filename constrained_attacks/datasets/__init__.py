@@ -1,3 +1,7 @@
+import sys, os
+
+sys.path.append(os.path.join(os.path.dirname(__file__),".."))
+
 from typing import List, Union
 
 from constrained_attacks.datasets.core import Dataset
