@@ -1,7 +1,7 @@
 import typing
 from abc import abstractmethod
 from typing import Any
-
+import torch
 import numpy as np
 import numpy.typing as npt
 
@@ -398,4 +398,153 @@ class TextConstraintsExecutor:
 
     def execute(self) -> str:
         visitor = TextConstraintsVisitor(self.constraint)
+        return visitor.execute()
+
+
+
+
+class PytorchConstraintsVisitor(ConstraintsVisitor):
+
+    str_operator_to_result = {
+        "+": lambda left, right: left + right,
+        "-": lambda left, right: left - right,
+        "*": lambda left, right: left * right,
+        "/": lambda left, right: left / right,
+        "**": lambda left, right: left**right,
+        "%": lambda left, right: left % right,
+    }
+
+    def __init__(
+        self,
+        constraint: BaseRelationConstraint,
+        x: "torch.Tensor",
+        feature_names: npt.ArrayLike = None,
+    ) -> None:
+        self.constraint = constraint
+        self.x = x
+        self.feature_names = feature_names
+
+    @staticmethod
+    def get_zeros_np(
+        operands: typing.List["torch.Tensor"],
+    ) -> "torch.Tensor":
+        i = np.argmax([op.ndim for op in operands])
+        return torch.zeros(operands[i].shape, dtype=operands[i].dtype)
+
+    def visit(self, constraint_node: ConstraintsNode) -> "torch.Tensor":
+
+        # ------------ Values
+        if isinstance(constraint_node, Constant):
+            return torch.from_numpy(np.array(constraint_node.constant))
+
+        elif isinstance(constraint_node, Feature):
+            feature_index = get_feature_index(
+                self.feature_names, constraint_node.feature_id
+            )
+            return self.x[:, feature_index]
+
+        elif isinstance(constraint_node, MathOperation):
+            left_operand = constraint_node.left_operand.accept(self)
+            right_operand = constraint_node.right_operand.accept(self)
+            operator = constraint_node.operator
+            if operator in self.str_operator_to_result:
+                return self.str_operator_to_result[operator](
+                    left_operand, right_operand
+                )
+            else:
+                raise NotImplementedError
+
+        elif isinstance(constraint_node, SafeDivision):
+            dividend = torch.tensor(constraint_node.dividend.accept(self))
+            divisor = torch.tensor(constraint_node.divisor.accept(self))
+            fill_value = constraint_node.fill_value.accept(self)
+            return torch.divide(
+                dividend,
+                divisor,
+                out=torch.full_like(dividend, fill_value),
+                #where=divisor != 0,
+            )
+
+        elif isinstance(constraint_node, Log):
+            operand = constraint_node.operand.accept(self)
+            if constraint_node.safe_value is not None:
+                safe_value = constraint_node.safe_value.accept(self)
+                return torch.log(
+                    operand,
+                    out=torch.full_like(operand, fill_value=safe_value),
+                    # where=(operand > 0),
+                )
+            return torch.log(operand)
+
+        elif isinstance(constraint_node, ManySum):
+            operands = torch.stack([torch.tensor(e.accept(self)) for e in constraint_node.operands])
+            return torch.sum(operands, dim=0)
+
+        # ------------ Constraints
+
+        # ------ Binary
+        elif isinstance(constraint_node, OrConstraint):
+            operands = torch.stack([torch.tensor(e.accept(self)) for e in constraint_node.operands])
+            return torch.min(operands, dim=0).values
+
+        elif isinstance(constraint_node, AndConstraint):
+            operands = [e.accept(self) for e in constraint_node.operands]
+            local_sum = operands[0]
+            for i in range(1, len(operands)):
+                local_sum = local_sum + operands[i]
+            return local_sum
+
+        # ------ Comparison
+        elif isinstance(constraint_node, LessEqualConstraint):
+            left_operand = constraint_node.left_operand.accept(self)
+            right_operand = constraint_node.right_operand.accept(self)
+            zeros = self.get_zeros_np([left_operand, right_operand])
+            my_sub = (left_operand - right_operand)
+            my_test = np.array([zeros.detach().numpy(), my_sub.detach().numpy()])
+            return torch.max(torch.tensor(my_test), dim=0).values
+
+        elif isinstance(constraint_node, LessConstraint):
+            left_operand = constraint_node.left_operand.accept(self) + EPS
+            right_operand = constraint_node.right_operand.accept(self)
+            zeros = self.get_zeros_np([left_operand, right_operand])
+            return torch.max(torch.tensor([zeros, (left_operand - right_operand)]), dim=0).values
+
+        elif isinstance(constraint_node, EqualConstraint):
+            left_operand = constraint_node.left_operand.accept(self)
+            right_operand = constraint_node.right_operand.accept(self)
+            return torch.abs(torch.tensor(left_operand - right_operand))
+
+            # ------ Extension
+
+        elif isinstance(constraint_node, Count):
+            operands = [torch.tensor(e.accept(self)) for e in constraint_node.operands]
+            if constraint_node.inverse:
+                operands = torch.stack(
+                    [(op != 0).float() for op in operands]
+                )
+            else:
+                operands = torch.stack(
+                    [(op == 0).float() for op in operands]
+                )
+            return torch.sum(operands, dim=0)
+
+        else:
+            raise NotImplementedError
+
+    def execute(self) -> "torch.Tensor":
+        return self.constraint.accept(self)
+
+class PytorchConstraintsExecutor:
+    def __init__(
+        self,
+        constraint: BaseRelationConstraint,
+        feature_names: npt.ArrayLike = None,
+    ):
+        self.constraint = constraint
+        self.feature_names = feature_names
+
+    def execute(self, x: "torch.Tensor") -> "torch.Tensor":
+        visitor = PytorchConstraintsVisitor(
+            self.constraint, x, self.feature_names
+        )
         return visitor.execute()

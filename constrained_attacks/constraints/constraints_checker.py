@@ -54,8 +54,20 @@ class ConstraintChecker:
             mutable_ok = np.ones(shape=x_adv.shape[:-1], dtype=np.bool)
         return mutable_ok
 
-    def check_constraints(self, x, x_adv) -> np.ndarray:
-        constraints = np.array(
+    def check_constraints(self, x, x_adv, pt=False) -> np.ndarray:
+        if pt:
+            x = x.numpy()
+            x_adv = x_adv.numpy()
+            constraints = np.array(
+            [
+                self._check_relationship_constraints(x_adv),
+                # self._check_boundary_constraints(x, x_adv),
+                # self._check_type_constraints(x_adv),
+                # self._check_mutable_constraints(x, x_adv), # uncomment and comment
+            ]
+        )
+        else:
+            constraints = np.array(
             [
                 self._check_relationship_constraints(x_adv),
                 self._check_boundary_constraints(x, x_adv),
@@ -63,5 +75,6 @@ class ConstraintChecker:
                 self._check_mutable_constraints(x, x_adv),
             ]
         )
+
         constraints = np.min(constraints, axis=0)
         return constraints
