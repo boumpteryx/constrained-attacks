@@ -2,6 +2,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+import torch
 
 from constrained_attacks.constraints.constraints import (
     Constraints,
@@ -56,8 +57,8 @@ class ConstraintChecker:
 
     def check_constraints(self, x, x_adv, pt=False) -> np.ndarray:
         if pt:
-            x = x.numpy()
-            x_adv = x_adv.numpy()
+            x = x.numpy() if isinstance(x, torch.Tensor) else x
+            x_adv = x_adv.numpy() if isinstance(x_adv, torch.Tensor) else x_adv
             constraints = np.array(
             [
                 self._check_relationship_constraints(x_adv),
