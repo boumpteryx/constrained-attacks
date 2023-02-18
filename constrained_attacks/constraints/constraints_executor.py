@@ -455,36 +455,32 @@ class PytorchConstraintsVisitor(ConstraintsVisitor):
                 raise NotImplementedError
 
         elif isinstance(constraint_node, SafeDivision):
-            dividend = torch.tensor(constraint_node.dividend.accept(self))
-            divisor = torch.tensor(constraint_node.divisor.accept(self))
+            dividend = constraint_node.dividend.accept(self)
+            divisor = constraint_node.divisor.accept(self)
             fill_value = constraint_node.fill_value.accept(self)
-            return torch.divide(
+            return torch.where(divisor!=0, torch.div(
                 dividend,
-                divisor,
-                out=torch.full_like(dividend, fill_value),
-                #where=divisor != 0,
-            )
+                divisor), fill_value)
+
 
         elif isinstance(constraint_node, Log):
             operand = constraint_node.operand.accept(self)
             if constraint_node.safe_value is not None:
                 safe_value = constraint_node.safe_value.accept(self)
-                return torch.log(
-                    operand,
-                    out=torch.full_like(operand, fill_value=safe_value),
-                    # where=(operand > 0),
-                )
+                return torch.where(operand > 0, torch.log(
+                    operand), safe_value)
+
             return torch.log(operand)
 
         elif isinstance(constraint_node, ManySum):
-            operands = torch.stack([torch.tensor(e.accept(self)) for e in constraint_node.operands])
+            operands = torch.stack([e.accept(self) for e in constraint_node.operands])
             return torch.sum(operands, dim=0)
 
         # ------------ Constraints
 
         # ------ Binary
         elif isinstance(constraint_node, OrConstraint):
-            operands = torch.stack([torch.tensor(e.accept(self)) for e in constraint_node.operands])
+            operands = torch.stack([e.accept(self) for e in constraint_node.operands])
             return torch.min(operands, dim=0).values
 
         elif isinstance(constraint_node, AndConstraint):
@@ -500,24 +496,24 @@ class PytorchConstraintsVisitor(ConstraintsVisitor):
             right_operand = constraint_node.right_operand.accept(self)
             zeros = self.get_zeros_np([left_operand, right_operand])
             my_sub = (left_operand - right_operand)
-            my_test = np.array([zeros.detach().numpy(), my_sub.detach().numpy()])
-            return torch.max(torch.tensor(my_test), dim=0).values
+            my_test = torch.stack([zeros, my_sub])
+            return torch.max(my_test, dim=0)[0]
 
         elif isinstance(constraint_node, LessConstraint):
             left_operand = constraint_node.left_operand.accept(self) + EPS
             right_operand = constraint_node.right_operand.accept(self)
             zeros = self.get_zeros_np([left_operand, right_operand])
-            return torch.max(torch.tensor([zeros, (left_operand - right_operand)]), dim=0).values
+            return torch.max([zeros, (left_operand - right_operand)], dim=0)
 
         elif isinstance(constraint_node, EqualConstraint):
             left_operand = constraint_node.left_operand.accept(self)
             right_operand = constraint_node.right_operand.accept(self)
-            return torch.abs(torch.tensor(left_operand - right_operand))
+            return torch.abs(left_operand - right_operand)
 
             # ------ Extension
 
         elif isinstance(constraint_node, Count):
-            operands = [torch.tensor(e.accept(self)) for e in constraint_node.operands]
+            operands = [e.accept(self) for e in constraint_node.operands]
             if constraint_node.inverse:
                 operands = torch.stack(
                     [(op != 0).float() for op in operands]
