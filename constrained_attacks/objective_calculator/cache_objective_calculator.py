@@ -43,9 +43,7 @@ class ObjectiveCalculator:
         norm : _type_, optional
             Norm to compute the distance, by default np.inf.
         fun_distance_preprocess : _type_, optional
-            function used to preprocess input before the distance metric
-            calculation, typically the n-1 first steps of an n step
-            classification Pipeline, by default lambdax:x.
+            function used to preprocess input before the constraint evaluation.
         n_jobs : int, optional
             Number of parallel jobs for returning adversarial examples,
             we recommand using the classifier parallel capabilities
@@ -79,11 +77,14 @@ class ObjectiveCalculator:
             self.constraints, self.thresholds["constraints"]
         )
 
+        x_clean_problem_space, _ ,_ = self.fun_distance_preprocess(x_clean)
+        x_adv_problem_space = np.array([self.fun_distance_preprocess(x_adv[i])[0] for i in range(len(x_clean))])
+
         constraint_violation = np.array(
             [
                 1
                 - constraints_checker.check_constraints(
-                    x_clean[i][np.newaxis, :], x_adv[i]
+                    x_clean_problem_space[i][np.newaxis, :], x_adv_problem_space[i]
                 )
                 for i in range(len(x_clean))
             ]
@@ -97,17 +98,15 @@ class ObjectiveCalculator:
             np.repeat(y_clean, x_adv.shape[1]),
         ]
         classification = classification.reshape(x_adv.shape[:-1])
-
-        x_clean_distance = self.fun_distance_preprocess(x_clean)
-        x_adv_shape = x_adv.shape
-        x_adv_distance = self.fun_distance_preprocess(
-            x_adv.reshape(-1, x_adv.shape[-1])
-        ).reshape((*x_adv_shape[:-1], -1))
+        #x_adv_shape = x_adv.shape
+        #x_adv_distance = self.fun_distance_preprocess(
+        #    x_adv.reshape(-1, x_adv.shape[-1])
+        #).reshape((*x_adv_shape[:-1], -1))
         distance = np.array(
             [
                 compute_distance(
-                    x_clean_distance[i][np.newaxis, :],
-                    x_adv_distance[i],
+                    x_clean[i][np.newaxis, :],
+                    x_adv[i],
                     self.norm,
                 )
                 for i in range(len(x_clean))
@@ -216,6 +215,8 @@ class ObjectiveCalculator:
         return_index_success=False,
         recompute=False,
     ):
+
+        ##x_clean and x_adv should be in the shape supported by the model (i.e. with normalization & encoding)
 
         successful_attacks = []
 
