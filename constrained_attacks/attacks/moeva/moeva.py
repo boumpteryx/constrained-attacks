@@ -245,6 +245,7 @@ class Moeva2:
                 for i, batch_indexes in iterable
             )
 
+        histories = None
         if self.save_history is not None:
             out = zip(*out)
             out = [np.concatenate(out_0) for out_0 in out]
@@ -252,5 +253,6 @@ class Moeva2:
             x_adv = out[0]
             histories = out[1]
             return x_adv, histories
-        else:
-            return np.concatenate(out)
+
+
+        return np.concatenate(out), histories
