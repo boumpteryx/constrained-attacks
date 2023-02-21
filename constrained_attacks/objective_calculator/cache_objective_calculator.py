@@ -98,10 +98,7 @@ class ObjectiveCalculator:
             np.repeat(y_clean, x_adv.shape[1]),
         ]
         classification = classification.reshape(x_adv.shape[:-1])
-        #x_adv_shape = x_adv.shape
-        #x_adv_distance = self.fun_distance_preprocess(
-        #    x_adv.reshape(-1, x_adv.shape[-1])
-        #).reshape((*x_adv_shape[:-1], -1))
+
         distance = np.array(
             [
                 compute_distance(
